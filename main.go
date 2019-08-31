@@ -23,7 +23,7 @@ var (
 
 func init() {
 	var err error
-	cli, err = client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.40"))
+	cli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		log.Fatal("unable to create docker client:", err)
 	}
