@@ -35,7 +35,7 @@ require (
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/docker/swarmkit v1.12.1-0.20190820142245-958d149179db // indirect
-	github.com/gdamore/tcell v1.2.0
+	github.com/gdamore/tcell v1.2.0 // indirect
 	github.com/godbus/dbus v4.1.0+incompatible // indirect
 	github.com/gofrs/uuid v3.2.0+incompatible // indirect
 	github.com/gogo/googleapis v1.2.0 // indirect
