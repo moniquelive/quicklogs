@@ -10,6 +10,7 @@ import (
 	"github.com/docker/cli/cli/compose/convert"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	"github.com/rivo/tview"
 )
@@ -40,14 +41,6 @@ func main() {
 
 func browser() error {
 	// Create the basic objects.
-	txtLogs := tview.
-		NewTextView().
-		SetDynamicColors(true).
-		SetChangedFunc(func() { app.Draw() })
-	txtLogs.
-		SetBorder(true).
-		SetTitle("tail -f (starting 10min ago)")
-
 	lstServices := tview.
 		NewList().
 		ShowSecondaryText(false).
@@ -55,6 +48,14 @@ func browser() error {
 	lstServices.
 		SetBorder(true).
 		SetTitle("Services")
+
+	txtLogs := tview.
+		NewTextView().
+		SetDynamicColors(true).
+		SetChangedFunc(func() { app.Draw() })
+	txtLogs.
+		SetBorder(true).
+		SetTitle("tail -f (starting 10min ago)")
 
 	// Create the layout.
 	pages := tview.NewFlex().
@@ -68,7 +69,7 @@ func browser() error {
 		return err
 	}
 	if len(stackNames) == 0 {
-		return fmt.Errorf("no stacks found!")
+		return fmt.Errorf("no docker swarm stacks found")
 	}
 
 	containerLogsOptions := types.ContainerLogsOptions{
@@ -80,11 +81,12 @@ func browser() error {
 	}
 
 	for _, stackName := range stackNames {
+		// adds services of this stack
 		for _, serviceName := range stackServices[stackName] {
 			lstServices.AddItem(serviceName, "", 0, nil)
 		}
 		// When the user selects a service, show its log.
-		lstServices.SetChangedFunc(func(i int, serviceName string, t string, s rune) {
+		lstServices.SetChangedFunc(func(i int, serviceName string, secondaryLabel string, s rune) {
 			if cancel != nil {
 				cancel()
 			}
@@ -95,7 +97,8 @@ func browser() error {
 
 			logStream, err := cli.ServiceLogs(ctx, serviceName, containerLogsOptions)
 			if err != nil {
-				_, _ = txtLogs.Write([]byte(fmt.Sprintf("error opening logs for service %s: %v", serviceName, err)))
+				errMsg := fmt.Sprintf("error opening logs for service %s: %v", serviceName, err)
+				_, _ = txtLogs.Write([]byte(errMsg))
 				return
 			}
 
@@ -107,14 +110,16 @@ func browser() error {
 	lstServices.SetCurrentItem(0)
 
 	app.SetRoot(pages, true)
-
 	return nil
 }
 
 func extractStackAndServices() (stackNames []string, stackServices map[string][]string, err error) {
 	// list swarm services
-	includeStackName := filters.NewArgs(filters.Arg("label", "com.docker.stack.namespace"))
-	allServices, err := cli.ServiceList(context.Background(), types.ServiceListOptions{Filters: includeStackName})
+	var allServices []swarm.Service
+	allServices, err = cli.ServiceList(
+	  context.Background(),
+	  types.ServiceListOptions{
+	    Filters: filters.NewArgs(filters.Arg("label", "com.docker.stack.namespace"))})
 	if err != nil {
 		return
 	}
