@@ -7,6 +7,8 @@ import (
 	"log"
 	"sort"
 
+	"github.com/gdamore/tcell"
+
 	"github.com/docker/cli/cli/compose/convert"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -25,25 +27,34 @@ func init() {
 	var err error
 	cli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		log.Fatal("unable to create docker client:", err)
+		log.Fatalln("unable to create docker client:", err)
 	}
 	app = tview.NewApplication()
 }
 
 func main() {
 	if err := browser(); err != nil {
-		log.Fatal("browser error:", err)
+		log.Fatalln("browser error:", err)
 	}
 	if err := app.Run(); err != nil {
-		log.Fatal("app.Run error:", err)
+		log.Fatalln("app.Run error:", err)
 	}
 }
 
 func browser() error {
 	// Create the basic objects.
+	lstStacks := tview.
+		NewList().
+		ShowSecondaryText(false).
+		SetDoneFunc(func() { app.Stop() })
+	lstStacks.
+		SetBorder(true).
+		SetTitle("Stacks")
+
 	lstServices := tview.
 		NewList().
 		ShowSecondaryText(false).
+		SetSelectedFocusOnly(true).
 		SetDoneFunc(func() { app.Stop() })
 	lstServices.
 		SetBorder(true).
@@ -57,10 +68,43 @@ func browser() error {
 		SetBorder(true).
 		SetTitle("tail -f (starting 10min ago)")
 
+	// set up key events
+	lstStacks.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyRight || event.Key() == tcell.KeyEnter {
+			app.SetFocus(lstServices)
+			return nil
+		}
+		return event
+	})
+
+	lstServices.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyLeft ||
+			event.Key() == tcell.KeyESC {
+			app.SetFocus(lstStacks)
+			return nil
+		}
+		if event.Key() == tcell.KeyEnter {
+			app.SetFocus(txtLogs)
+			return nil
+		}
+		return event
+	})
+
+	txtLogs.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyESC {
+			app.SetFocus(lstServices)
+			return nil
+		}
+		return event
+	})
+
 	// Create the layout.
+	top := tview.NewFlex().
+		AddItem(lstStacks, 0, 1, true).
+		AddItem(lstServices, 0, 4, false)
 	pages := tview.NewFlex().
 		SetDirection(tview.FlexRow).
-		AddItem(lstServices, 0, 1, true).
+		AddItem(top, 0, 1, true).
 		AddItem(txtLogs, 0, 4, false)
 
 	// create map: stackName -> [service1, service2, ...]
@@ -80,31 +124,40 @@ func browser() error {
 		Since:      "10m",
 	}
 
+	// When the user selects a stack, show its services.
 	for _, stackName := range stackNames {
+		lstStacks.AddItem(stackName, "", 0, nil)
+	}
+	lstStacks.SetChangedFunc(func(i int, stackName string, secondaryLabel string, s rune) {
+		lstServices.Clear()
 		// adds services of this stack
 		for _, serviceName := range stackServices[stackName] {
 			lstServices.AddItem(serviceName, "", 0, nil)
 		}
-		// When the user selects a service, show its log.
-		lstServices.SetChangedFunc(func(i int, serviceName string, secondaryLabel string, s rune) {
-			if cancel != nil {
-				cancel()
-			}
-			txtLogs.Clear()
+	})
+	// force change event
+	lstStacks.SetCurrentItem(-1)
+	lstStacks.SetCurrentItem(0)
 
-			var ctx context.Context
-			ctx, cancel = context.WithCancel(context.Background())
+	// When the user selects a service, show its log.
+	lstServices.SetChangedFunc(func(_ int, serviceName string, _ string, _ rune) {
+		if cancel != nil {
+			cancel()
+		}
+		txtLogs.Clear()
 
-			logStream, err := cli.ServiceLogs(ctx, serviceName, containerLogsOptions)
-			if err != nil {
-				errMsg := fmt.Sprintf("error opening logs for service %s: %v", serviceName, err)
-				_, _ = txtLogs.Write([]byte(errMsg))
-				return
-			}
+		var ctx context.Context
+		ctx, cancel = context.WithCancel(context.Background())
 
-			go io.Copy(tview.ANSIWriter(txtLogs), logStream)
-		})
-	}
+		logStream, err := cli.ServiceLogs(ctx, serviceName, containerLogsOptions)
+		if err != nil {
+			errMsg := fmt.Sprintf("error opening logs for service %s: %v", serviceName, err)
+			_, _ = txtLogs.Write([]byte(errMsg))
+			return
+		}
+
+		go io.Copy(tview.ANSIWriter(txtLogs), logStream)
+	})
 	// force change event
 	lstServices.SetCurrentItem(-1)
 	lstServices.SetCurrentItem(0)
@@ -117,9 +170,9 @@ func extractStackAndServices() (stackNames []string, stackServices map[string][]
 	// list swarm services
 	var allServices []swarm.Service
 	allServices, err = cli.ServiceList(
-	  context.Background(),
-	  types.ServiceListOptions{
-	    Filters: filters.NewArgs(filters.Arg("label", "com.docker.stack.namespace"))})
+		context.Background(),
+		types.ServiceListOptions{
+			Filters: filters.NewArgs(filters.Arg("label", "com.docker.stack.namespace"))})
 	if err != nil {
 		return
 	}
