@@ -17,8 +17,8 @@ _Soon_
 
 ## Built With
 
-*	[Docker](github.com/docker/docker/client) - Docker client api
-*	[TView](github.com/rivo/tview) - Rich interactive widgets for terminal-based UIs written in Go
+*	[Docker](https://github.com/docker/docker/client) - Docker client api
+*	[TView](https://github.com/rivo/tview) - Rich interactive widgets for terminal-based UIs written in Go
 
 ## Contributing
 
