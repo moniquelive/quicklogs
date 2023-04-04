@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/docker/cli v20.10.18+incompatible
-	github.com/docker/docker v20.10.18+incompatible
+	github.com/docker/docker v20.10.24+incompatible
 	github.com/gdamore/tcell/v2 v2.5.3
 	github.com/rivo/tview v0.0.0-20220916081518-2e69b7385a37
 )
