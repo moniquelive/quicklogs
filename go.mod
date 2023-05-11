@@ -9,7 +9,7 @@ require (
 	github.com/rivo/tview v0.0.0-20220916081518-2e69b7385a37
 )
 
-require github.com/docker/distribution v2.8.1+incompatible // indirect
+require github.com/docker/distribution v2.8.2+incompatible // indirect
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
